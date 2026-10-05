@@ -27,6 +27,8 @@ mkdir -p ~/.claude/skills
 git clone https://github.com/huazhongxian0/source-tour.git ~/.claude/skills/source-tour
 ```
 
+已有 GitHub SSH 访问权限时，也可以把上述克隆地址换成 `git@github.com:huazhongxian0/source-tour.git`。
+
 已通过 Git 安装时，可在相应目录执行 `git pull --ff-only` 更新。例如：
 
 ```bash
