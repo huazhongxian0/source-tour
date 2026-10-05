@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>源码导读</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1018;--panel:#111a26;--line:#29384a;--text:#e1eaf5;--muted:#9bacbf;--accent:#65d6eb}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{min-height:86px;padding:16px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+h1{font-size:22px;margin:0;letter-spacing:-.5px}
+h1 span{color:var(--accent)}
+header p{font-size:14px;color:var(--muted);margin:3px 0 0}
+.badge{font:12px ui-monospace,monospace;color:var(--accent);padding:6px 10px;border:1px solid #315364;border-radius:5px;white-space:nowrap}
+.layout{display:grid;grid-template-columns:46% 54%;height:calc(100dvh - 94px);min-height:620px}
+.map-pane{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--line)}
+.toolbar{padding:12px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.views{display:flex;gap:6px}
+button,select{font:inherit;font-size:14px;color:var(--text);background:#1a2839;border:1px solid #3a4c63;border-radius:6px;padding:7px 11px;cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,select:focus-visible,.fnode:focus-visible rect{outline:3px solid var(--accent);outline-offset:2px}
+.views button[aria-pressed=true]{color:#07121b;background:var(--accent);border-color:var(--accent)}
+select{flex:1;min-width:140px;max-width:100%}
+.map-scroll{overflow:auto;flex:1;min-height:0;background:#0d1420;scroll-behavior:smooth}
+.map{position:relative;width:100%;min-width:460px;margin:auto}
+.map svg{display:block;width:100%;height:auto}
+.hint{padding:8px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+/* ---- flow nodes ---- */
+.fnode{cursor:pointer}
+.fnode rect{fill:#16233a;stroke:#3a4c63;stroke-width:2;transition:stroke .15s,fill .15s}
+.fnode text{fill:var(--text);font-size:15px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;pointer-events:none}
+.fnode .sub{fill:var(--muted);font-size:11.5px}
+.fnode:hover rect{stroke:var(--accent);fill:#1a2c44}
+.fnode[aria-pressed=true] rect{stroke:#89f1ff;fill:#1c3049;filter:drop-shadow(0 0 6px #65d6eb55)}
+.fnode.kind-start rect,.fnode.kind-end rect{stroke:#58c98d}
+.fnode.kind-decision rect{stroke:#e0b25c;stroke-dasharray:6 4}
+.fnode.kind-external rect{stroke:#8f7bd8}
+/* ---- sequence ---- */
+.actor rect{fill:#16233a;stroke:#3a4c63;stroke-width:2}
+.actor text{fill:var(--text);font-size:14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.lifeline{stroke:#2c3c50;stroke-width:1.5;stroke-dasharray:5 5}
+.smsg line,.smsg path{stroke:#76d8f5;stroke-width:2.2}
+.smsg text{fill:#c6d7e8;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.smsg{cursor:pointer}
+.smsg:hover line,.smsg:hover path{stroke:#89f1ff;stroke-width:3}
+.smsg:hover text{fill:#89f1ff}
+.smsg[aria-pressed=true] line,.smsg[aria-pressed=true] path{stroke:#89f1ff;stroke-width:3.2;filter:drop-shadow(0 0 5px #65d6eb66)}
+.smsg[aria-pressed=true] text{fill:#89f1ff;font-weight:600}
+.edge{fill:none;stroke:#76d8f5;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.elabel{fill:#8fa8c0;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+/* ---- reader ---- */
+.reader{overflow:auto;padding:26px 28px 40px;min-width:0}
+.eyebrow{color:var(--accent);font-size:13px;letter-spacing:1px;margin-bottom:8px}
+h2{font-size:23px;line-height:1.4;margin:0 0 12px}
+#description{color:#b9c8da;margin:0 0 20px;white-space:pre-wrap}
+.tabs{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 12px}
+.tabs button[aria-pressed=true]{color:#07121b;background:var(--accent);border-color:var(--accent)}
+.filebar{padding:12px 14px;background:#172233;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9fdcf0;overflow-wrap:anywhere}
+.filebar span{color:var(--muted)}
+.codebox{background:#0d1420;border:1px solid var(--line);border-radius:0 0 10px 10px;max-height:48vh;overflow:auto;padding:10px 0;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
+.line{display:flex;min-width:max-content}
+.line .ln{flex:0 0 auto;width:3.6em;text-align:right;padding-right:14px;color:#54657a;user-select:none}
+.line .src{white-space:pre;padding-right:16px}
+.line.focus{background:#16283c}
+.kw{color:#7cc7ff}
+.str{color:#9be39b}
+.comment{color:#7b8a9a;font-style:italic}
+.num{color:#e0b25c}
+.code-actions{display:flex;gap:14px;align-items:center;margin:12px 0 26px;font-size:14px;color:var(--muted)}
+.code-actions label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.toast{color:#7be0a3;font-size:13px}
+.next{border-top:1px solid var(--line);padding-top:16px}
+.next p{font-size:13px;color:var(--muted);margin:0 0 10px}
+.next div{display:flex;gap:8px;flex-wrap:wrap}
+.note{margin-top:28px;font-size:12.5px;color:#6d7f92;border-top:1px solid var(--line);padding-top:14px}
+@media (max-width:800px){.layout{grid-template-columns:1fr;height:auto}.map-pane{border-right:0;border-bottom:1px solid var(--line)}.map-scroll{max-height:60vh}}
+</style></head>
+<body>
+<header><div><h1 id="h1"></h1><p id="sub"></p></div><div class="badge" id="badge"></div></header>
+<main class="layout">
+<section class="map-pane" aria-label="可点击的流程图与时序图">
+  <div class="toolbar">
+    <div class="views" role="group" aria-label="切换视图">
+      <button id="v-flow" aria-pressed="true">流程图</button>
+      <button id="v-seq" aria-pressed="false">时序图</button>
+    </div>
+    <select id="jump" aria-label="选择节点"></select>
+    <button id="minus" aria-label="缩小">−</button>
+    <button id="fit">适配</button>
+    <button id="plus" aria-label="放大">＋</button>
+  </div>
+  <div class="map-scroll" id="map-scroll">
+    <div class="map" id="map">
+      <svg id="flow-svg" role="img" aria-label="流程图"></svg>
+      <svg id="seq-svg" role="img" aria-label="时序图" style="display:none"></svg>
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+</section>
+<section class="reader" id="reader" aria-label="节点说明与源码">
+  <div class="eyebrow" id="tag"></div>
+  <h2 id="title"></h2>
+  <p id="description"></p>
+  <div class="tabs" id="tabs" aria-label="相关源码"></div>
+  <div class="filebar" id="filepath"></div>
+  <div class="codebox" id="code" tabindex="0" aria-label="源码及行号"></div>
+  <div class="code-actions">
+    <label><input type="checkbox" id="full"> 查看文件快照</label>
+    <button id="copy">复制代码</button>
+    <span class="toast" id="toast" role="status"></span>
+  </div>
+  <nav class="next" aria-label="流程下一步"><p>沿流程继续阅读</p><div id="next"></div></nav>
+  <p class="note" id="note"></p>
+</section>
+</main>
+<script id="data" type="application/json">
+__DATA__
+</script>
+<script>
+'use strict';
+const D=JSON.parse(document.getElementById('data').textContent),$=id=>document.getElementById(id);
+const nodes=D.flow.nodes,byId=Object.fromEntries(nodes.map(n=>[n.id,n]));
+nodes.forEach(n=>{if(!n.next)n.next=D.flow.edges.filter(e=>e.from===n.id).map(e=>e.to)});
+let current=nodes[0],refIndex=0,scale=100,copyText='',view='flow',spyLockUntil=0;
+const SVGNS='http://www.w3.org/2000/svg';
+const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+const KW='const|let|var|if|else|return|async|await|function|for|while|try|catch|finally|throw|new|true|false|undefined|null|export|import|from|class|interface|type|readonly|extends|implements|switch|case|break|continue|yield|static|public|private|protected|void|this|super|of|in|def|elif|pass|lambda|with|as|raise|is|not|and|or|None|True|False|func|package|go|chan|defer|struct|map|range|select|fn|mut|impl|pub|use|mod|match|where|unsafe|move|ref|self|Self';
+function highlight(s){
+  const re=new RegExp('(\\/\\/.*$|#.*$|\\/\\*[\\s\\S]*?\\*\\/|\\b\\d+(?:\\.\\d+)?\\b|\'(?:[^\'\\\\]|\\\\.)*\'|"(?:[^"\\\\]|\\\\.)*"|`(?:[^`\\\\]|\\\\.)*`|\\b(?:'+KW+')\\b)','g');
+  let last=0,result='',m;
+  while((m=re.exec(s))){
+    result+=esc(s.slice(last,m.index));
+    const t=m[0],kind=/^(\/\/|#|\/\*)/.test(t)?'comment':/^["'`]/.test(t)?'str':/^\d/.test(t)?'num':'kw';
+    result+='<span class="'+kind+'">'+esc(t)+'</span>';
+    last=m.index+m[0].length;
+  }
+  return result+esc(s.slice(last));
+}
+function el(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function txt(parent,x,y,str,cls,anchor){const t=el('text',{x,y,'text-anchor':anchor||'middle'},parent);if(cls)t.setAttribute('class',cls);t.textContent=str;return t}
+function wrap(s,max){const out=[];let cur='';for(const ch of s){cur+=ch;if(cur.length>=max){out.push(cur);cur=''}}if(cur)out.push(cur);return out.slice(0,2)}
+
+/* ================= flow chart ================= */
+const NW=260,NH=64,CW=340,RH=150,PAD=36;
+let flowPos={};
+function renderFlow(){
+  const svg=$('flow-svg');
+  const maxC=Math.max(...nodes.map(n=>n.col||0)),maxR=Math.max(...nodes.map(n=>n.row||0));
+  const W=PAD*2+(maxC+1)*CW- (CW-NW),H=PAD*2+(maxR+1)*RH-(RH-NH);
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const defs=el('defs',{},svg);
+  const mk=el('marker',{id:'tip','markerWidth':'10','markerHeight':'10','refX':'8','refY':'5','orient':'auto','markerUnits':'userSpaceOnUse'},defs);
+  el('path',{d:'M1 1 L8 5 L1 9',fill:'none',stroke:'#8ae7ff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'},mk);
+  nodes.forEach(n=>{flowPos[n.id]={x:PAD+(n.col||0)*CW,y:PAD+(n.row||0)*RH}});
+  // edges first (under nodes)
+  D.flow.edges.forEach(e=>{
+    const a=flowPos[e.from],b=flowPos[e.to];if(!a||!b)return;
+    const ax=a.x+NW/2,ay=a.y,bx=b.x+NW/2,by=b.y;
+    let d,mx,my;
+    if((byId[e.to].row||0)>(byId[e.from].row||0)){ // downward
+      const y1=ay+NH,mid=(y1+by)/2;
+      d='M'+ax+' '+y1+' V'+mid+' H'+bx+' V'+by;mx=(ax+bx)/2;my=mid;
+    }else if((byId[e.to].row||0)===(byId[e.from].row||0)&&(byId[e.to].col||0)>(byId[e.from].col||0)){ // rightward
+      d='M'+(a.x+NW)+' '+(ay+NH/2)+' H'+b.x;mx=(a.x+NW+b.x)/2;my=ay+NH/2-8;
+    }else{ // back edge: route around the left
+      const lx=Math.min(a.x,b.x)-26;
+      d='M'+a.x+' '+(ay+NH/2)+' H'+lx+' V'+(by+NH/2)+' H'+b.x;mx=lx-6;my=(ay+by)/2+NH/2;
+    }
+    el('path',{d,class:'edge','marker-end':'url(#tip)'},svg);
+    if(e.label){const t=txt(svg,mx,my-6,e.label,'elabel');if(d.startsWith('M'+a.x))t.setAttribute('text-anchor','end')}
+  });
+  // nodes
+  nodes.forEach(n=>{
+    const p=flowPos[n.id];
+    const g=el('g',{class:'fnode kind-'+(n.kind||'process'),tabindex:'0',role:'button','aria-pressed':'false','aria-label':n.title,'data-id':n.id},svg);
+    el('rect',{x:p.x,y:p.y,width:NW,height:NH,rx:12},g);
+    const lines=wrap(n.title,15);
+    const cy=p.y+(lines.length>1?NH/2-8:NH/2+5);
+    lines.forEach((s,i)=>txt(g,p.x+NW/2,cy+i*19,s));
+    if(n.tag)txt(g,p.x+NW/2,p.y+NH+16,n.tag,'sub');
+    g.addEventListener('click',()=>selectNode(n.id));
+    g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode(n.id)}});
+  });
+}
+
+/* ================= sequence diagram ================= */
+const AW=200,APAD=90,AY0=110,ASTEP=64;
+let seqMsgPos=[];
+function renderSeq(){
+  const svg=$('seq-svg'),S=D.sequence;
+  const actors=S.actors,msgs=S.messages;
+  const xi=i=>APAD+i*AW;
+  const W=APAD*2+(actors.length-1)*AW,H=AY0+msgs.length*ASTEP+40;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const defs=el('defs',{},svg);
+  const mk=el('marker',{id:'stip','markerWidth':'10','markerHeight':'10','refX':'8','refY':'5','orient':'auto','markerUnits':'userSpaceOnUse'},defs);
+  el('path',{d:'M1 1 L8 5 L1 9',fill:'none',stroke:'#8ae7ff','stroke-width':'2.4','stroke-linecap':'round','stroke-linejoin':'round'},mk);
+  actors.forEach((a,i)=>{
+    el('line',{x1:xi(i),y1:74,x2:xi(i),y2:H-16,class:'lifeline'},svg);
+    const g=el('g',{class:'actor'},svg);
+    el('rect',{x:xi(i)-78,y:30,width:156,height:38,rx:9},g);
+    txt(g,xi(i),54,wrap(a.label,10)[0]);
+  });
+  msgs.forEach((m,i)=>{
+    const y=AY0+i*ASTEP,ai=actors.findIndex(a=>a.id===m.from),bi=actors.findIndex(a=>a.id===m.to);
+    if(ai<0||bi<0)return;
+    const g=el('g',{class:'smsg','data-id':m.node||'',tabindex:'0',role:'button','aria-pressed':'false','aria-label':m.label},svg);
+    if(ai===bi){
+      const x=xi(ai);
+      el('path',{d:'M'+x+' '+y+' H'+(x+46)+' V'+(y+24)+' H'+x,'marker-end':'url(#stip)',fill:'none'},g);
+      txt(g,x+52,y+10,m.label,'','start');
+    }else{
+      const x1=xi(ai),x2=xi(bi);
+      el('line',{x1:x1+(x2>x1?4:-4),y1:y,x2:x2+(x2>x1?-6:6),y2:y,'marker-end':'url(#stip)'},g);
+      txt(g,(x1+x2)/2,y-10,m.label);
+    }
+    seqMsgPos.push({id:m.node,y});
+    if(m.node&&byId[m.node]){
+      g.addEventListener('click',()=>selectNode(m.node));
+      g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode(m.node)}});
+    }else{g.style.cursor='default'}
+  });
+}
+
+/* ================= reader ================= */
+function renderCode(){
+  const r=current.refs[refIndex];if(!r)return;
+  const lines=(D.files[r.path]||'// 文件内容未嵌入').split('\n');if(lines.at(-1)==='')lines.pop();
+  const full=$('full').checked,start=full?1:r.start,end=full?lines.length:Math.min(r.end,lines.length);
+  copyText=lines.slice(start-1,end).join('\n');
+  $('filepath').replaceChildren(document.createTextNode(r.path));
+  const mark=document.createElement('span');mark.textContent='  · L'+r.start+'–'+r.end;$('filepath').append(mark);
+  $('code').innerHTML=lines.slice(start-1,end).map((s,i)=>{
+    const no=start+i;
+    return '<div class="line '+(full&&no>=r.start&&no<=r.end?'focus':'')+'" data-line="'+no+'"><span class="ln">'+no+'</span><span class="src">'+highlight(s)+'</span></div>';
+  }).join('');
+  $('code').scrollTop=0;$('code').scrollLeft=0;
+  if(full){const q=$('code').querySelector('[data-line="'+r.start+'"]');if(q)$('code').scrollTop=q.offsetTop-$('code').firstElementChild.offsetTop}
+  Array.from($('tabs').children).forEach((b,i)=>b.setAttribute('aria-pressed',String(i===refIndex)));
+}
+function markPressed(){
+  document.querySelectorAll('.fnode,.smsg').forEach(g=>g.setAttribute('aria-pressed',String(g.getAttribute('data-id')===current.id)));
+}
+function scrollMapToCurrent(){
+  spyLockUntil=Date.now()+900;
+  const pane=$('map-scroll'),map=$('map');
+  const svg=view==='flow'?$('flow-svg'):$('seq-svg');
+  const vb=svg.viewBox.baseVal,ratio=map.clientWidth/vb.width;
+  let x=0,y=0,h=NH;
+  if(view==='flow'){const p=flowPos[current.id];if(!p)return;x=p.x+NW/2;y=p.y}
+  else{const m=seqMsgPos.find(m=>m.id===current.id);if(!m)return;y=m.y;h=ASTEP;x=svg.viewBox.baseVal.width/2}
+  pane.scrollTop=y*ratio-pane.clientHeight/2+h*ratio/2;
+  pane.scrollLeft=x*ratio-pane.clientWidth/2;
+}
+function selectNode(id,locate=true){
+  const n=byId[id];if(!n)return;
+  current=n;refIndex=0;$('jump').value=id;
+  $('tag').textContent=n.tag||'';$('title').textContent=n.title;$('description').textContent=n.desc||'';$('toast').textContent='';
+  markPressed();
+  $('tabs').replaceChildren();
+  n.refs.forEach((r,i)=>{const b=document.createElement('button');b.textContent=r.label;b.onclick=()=>{refIndex=i;renderCode()};$('tabs').append(b)});
+  $('next').replaceChildren();
+  (n.next||[]).forEach(tid=>{const t=byId[tid];if(!t)return;const b=document.createElement('button');b.textContent=t.title+' →';b.onclick=()=>selectNode(tid);$('next').append(b)});
+  renderCode();
+  try{history.replaceState(null,'','#'+id)}catch(_){}
+  if(locate)scrollMapToCurrent();
+  $('reader').scrollTop=0;
+  if(window.matchMedia&&matchMedia('(max-width:800px)').matches&&!locate)$('reader').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ================= bootstrap ================= */
+$('h1').innerHTML=esc(D.meta.title).replace(/ \/ /,' <span>/</span> ');
+$('sub').textContent=D.meta.subtitle||'';
+$('badge').textContent=D.meta.badge||'';
+$('note').textContent=D.meta.note||'';
+$('hint').textContent=nodes.length+' 个节点 · 点击流程图节点或时序图消息查看对应源码 · 滚动图时右侧自动切换到当前位置的节点 · 可用 Tab / Enter 操作';
+nodes.forEach((n,i)=>{const o=document.createElement('option');o.value=n.id;o.textContent=String(i+1).padStart(2,'0')+' · '+n.title;$('jump').append(o)});
+renderFlow();renderSeq();
+function setView(v){
+  view=v;
+  $('flow-svg').style.display=v==='flow'?'':'none';
+  $('seq-svg').style.display=v==='seq'?'':'none';
+  $('v-flow').setAttribute('aria-pressed',String(v==='flow'));
+  $('v-seq').setAttribute('aria-pressed',String(v==='seq'));
+  scrollMapToCurrent();
+}
+$('v-flow').onclick=()=>setView('flow');
+$('v-seq').onclick=()=>setView('seq');
+$('jump').onchange=e=>selectNode(e.target.value);
+$('full').onchange=renderCode;
+function zoom(value){scale=Math.min(240,Math.max(100,value));$('map').style.width=scale+'%';$('fit').textContent=scale===100?'适配':scale+'%';scrollMapToCurrent()}
+$('plus').onclick=()=>zoom(scale+25);$('minus').onclick=()=>zoom(scale-25);$('fit').onclick=()=>zoom(100);
+$('copy').onclick=async()=>{try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(copyText)}else{const t=document.createElement('textarea');t.value=copyText;t.style.position='fixed';t.style.left='-9999px';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();if(!ok)throw Error('copy')}$('toast').textContent='已复制'}catch{$('toast').textContent='请在代码区选择并复制'}};
+/* ================= scroll-spy：右侧源码跟随图的滚动位置 ================= */
+function spy(){
+  if(Date.now()<spyLockUntil)return;
+  const pane=$('map-scroll'),map=$('map');
+  const svg=view==='flow'?$('flow-svg'):$('seq-svg');
+  const vb=svg.viewBox.baseVal;if(!vb.width)return;
+  const ratio=map.clientWidth/vb.width,cy=pane.scrollTop+pane.clientHeight/2;
+  let best=null,bd=Infinity;
+  if(view==='flow'){for(const n of nodes){const p=flowPos[n.id];if(!p)continue;const d=Math.abs((p.y+NH/2)*ratio-cy);if(d<bd){bd=d;best=n.id}}}
+  else{for(const m of seqMsgPos){if(!m.id||!byId[m.id])continue;const d=Math.abs(m.y*ratio-cy);if(d<bd){bd=d;best=m.id}}}
+  if(best&&best!==current.id)selectNode(best,false);
+}
+let spyTimer=0;
+$('map-scroll').addEventListener('scroll',()=>{if(spyTimer)return;spyTimer=setTimeout(()=>{spyTimer=0;spy()},120)},{passive:true});
+
+const startId=byId[location.hash.slice(1)]?location.hash.slice(1):nodes[0].id;
+selectNode(startId,false);
+</script></body></html>
